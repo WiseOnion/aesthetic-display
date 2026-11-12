@@ -1,37 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
-  <title>Aesthetic Display</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      -webkit-user-select: none;
-      user-select: none;
-      -webkit-touch-callout: none;
-    }
-    img {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      object-fit: cover;
-      object-position: center;
-      display: block;
-      pointer-events: none;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>Aesthetic Display</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    overscroll-behavior: none;
+    touch-action: none;
+    cursor: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  img {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    pointer-events: none;
+    -webkit-user-drag: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+  img.ready { opacity: 1; }
+</style>
 </head>
 <body>
-  <img src="./eye.GIF" alt="">
+<img id="eye" alt="" draggable="false">
+<script>
+(function () {
+  var img = document.getElementById('eye');
+  var SRC = './eye.GIF';
+  var tries = 0;
+
+  // Size from the real window, so a half-sized launch layout can't stick.
+  function fit() {
+    img.style.width = window.innerWidth + 'px';
+    img.style.height = window.innerHeight + 'px';
+  }
+
+  function load(bust) {
+    img.classList.remove('ready');
+    img.src = bust ? SRC + '?v=' + Date.now() : SRC;
+  }
+
+  // Only reveal the GIF once it has fully loaded, so a partial paint never shows.
+  img.onload = function () {
+    tries = 0;
+    fit();
+    img.classList.add('ready');
+  };
+
+  // If loading fails (Wi-Fi not up yet, etc.), retry with a growing delay, up to 30s.
+  img.onerror = function () {
+    tries++;
+    setTimeout(function () { load(true); }, Math.min(30000, 3000 * tries));
+  };
+
+  ['resize', 'orientationchange', 'pageshow'].forEach(function (e) {
+    window.addEventListener(e, function () {
+      fit();
+      setTimeout(fit, 300);
+    });
+  });
+  setInterval(fit, 2000);
+
+  // Best effort only: may do nothing inside some kiosk apps.
+  function lockAwake() {
+    try {
+      if (navigator.wakeLock) {
+        navigator.wakeLock.request('screen').catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+      fit();
+      if (!img.complete || !img.naturalWidth) load(true);
+      lockAwake();
+    }
+  });
+
+  // Every 6 hours, reload to clear any stall, but only if the site is reachable,
+  // so being offline can never replace the display with an error page.
+  setInterval(function () {
+    fetch(location.href, { method: 'HEAD', cache: 'no-store' })
+      .then(function (r) { if (r.ok) location.reload(); })
+      .catch(function () {});
+  }, 6 * 60 * 60 * 1000);
+
+  fit();
+  lockAwake();
+  load(false);
+})();
+</script>
 </body>
 </html>
